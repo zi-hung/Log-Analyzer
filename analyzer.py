@@ -1,63 +1,10 @@
-import re
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
-from collections.abc import Callable
 import json
-
-type Record = tuple[datetime, str, str]
-
-
-
-class SkipBadLine:
-    def __init__(self, path: Path):
-        self.path = path
-        self.bad_count = 0
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        if exc_type == ValueError:
-            self.bad_count += 1
-            logging.warning(f"{self.path.name}: {exc}")
-        return exc_type == ValueError
-
-
-
-def find_log_files(folder: Path) -> list[Path]:
-    return sorted(folder.glob("*.log"))
-
-
-def read_lines(path: Path):
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            yield line.strip("\n")
-
-
-def parse_line(line: str) -> Record:
-    match = re.search(r"(\d+-\d+-\d+\s\d+:\d+:\d+)\s\[([A-Z]+)\]\s(.+)", line)
-    if match is None:
-        raise ValueError(f"正则匹配失败: {line}")
-    time_text, level, msg = match.groups()
-    try:
-        time = datetime.strptime(time_text, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
-        raise ValueError(f"时间不合法: {line}")
-    return (time, level, msg)
-
-
-def make_window(end: datetime, hours: int) -> Callable[[Record], bool]:
-    start = end - timedelta(hours=hours)
-    def in_window(record: Record) -> bool:
-        return start <= record[0] <= end
-    return in_window
-
-
-def filter_records(records: list[Record], keep: Callable[[Record], bool]):
-    for record in records:
-        if keep(record):
-            yield record
+from reader import find_log_files, read_lines
+from parsing import SkipBadLine, parse_line
+from picker import make_window, filter_records
 
 
 def main():
@@ -81,6 +28,8 @@ def main():
             with skip:
                 valid.append(parse_line(line))
         bad_count += skip.bad_count
+
+
 
     fmt = "%Y-%m-%d %H:%M:%S"
     hours = 2
@@ -123,7 +72,11 @@ def main():
 
     logging.info("报告写入完毕")
 
-main()
+
+if __name__ == "__main__":
+    main()
+
+
 
     
 

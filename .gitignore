@@ -1,0 +1,6 @@
+__pycache__/
+logs/
+report.json
+analyzer_run.log
+before.*
+after.txt
